@@ -55,8 +55,7 @@ This project uses OpenWeather endpoints:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/weather-api-project.git
-cd weather-api-project
+git clone https://github.com/Omniscient-Frame/API-Integration-Weather-Data-Fetching.git
 ```
 
 ### 2. Install dependencies
