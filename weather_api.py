@@ -73,19 +73,34 @@ for city in cities:
         weather_info = weather_analysis(coordinates)
         df = pd.json_normalize(weather_info["main"])
         df["City Name"] = city
-
+        
     if __name__ == "__main__":
             to_drop = ["temp_min","temp_max","sea_level","grnd_level"]
-            df.drop(to_drop,axis=1,inplace=True)
+            df.drop(to_drop,axis=1,inplace=True,errors="ignore")
+
+            #city name in 1st column 
+            check_col = ["City Name"] + [c for c in df.columns if c != "City Name"]
+            df = df[check_col]      
+
             if os.path.isfile("weather_data.csv"):
                 
                 existing_df = pd.read_csv("weather_data.csv")
                 
+
+                missing_cols = [c for c in df.columns if c not in existing_df.columns]
+                print(missing_cols)
+
+                existing_df = existing_df[df.columns]
+                print(existing_df)
+
                 combined_df = pd.concat([existing_df, df], ignore_index=True)
                 
                 combined_df.drop_duplicates(subset=["City Name"], keep="last", inplace=True)
 
-                combined_df.to_csv("weather_data.csv", mode="w", header=True, index=False)
+                combined_df.to_csv("weather_data.csv", mode="a", header=True, index=False)
+
+                print(combined_df)
+
             else:
                 df.to_csv("weather_data.csv", mode="w", header=True, index=False)
 
