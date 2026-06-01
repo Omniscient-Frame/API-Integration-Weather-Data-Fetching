@@ -6,8 +6,6 @@ import csv
 import os
 from dotenv import load_dotenv
 
-np.random.seed(69)
-
 load_dotenv()
 
 API_key = os.getenv("API_KEY")
@@ -50,8 +48,6 @@ def get_weather_info(coordinate):
         return None
     return res.json()
 
-conn =  sq.connect("Weather_Data.db")
-cities = []
 
 def WeatherAnalysis(city_name,weather_info):
     return {
@@ -69,25 +65,41 @@ def WeatherAnalysis(city_name,weather_info):
     "Sunset": weather_info["sys"]["sunset"]
     }
 
-def main():
+def PresentInfo():
     City_Name = input("Enter the name of the city: ").strip()
     coordinates = FindCoord(City_Name)
 
     if coordinates == None:
-        print("coordinate not found...skipping")
+        print("coordinate not found...exiting")
+        print("Enter Valid City Name..")
         return
 
     weather_info = get_weather_info(coordinates)
 
     data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])
 
-    print(data.to_string())
+    return data.to_string()
 
+
+def main():
+
+    while True:
+
+        UserInput = int(input("Enter 1 - to get weather info,\n 2 - to exit : "))
+
+        if UserInput == 1:
+            print(PresentInfo())
+
+        elif UserInput == 2:
+            break
+
+        else:
+            print("Invalid Input...Try Again")
+            continue
+    
 if __name__=="__main__":
-    main()
-            
-            
-        
+    main()            
+
         
 
 
