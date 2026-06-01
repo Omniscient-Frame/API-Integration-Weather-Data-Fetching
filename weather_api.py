@@ -19,7 +19,8 @@ coord_base_url = "https://api.openweathermap.org/data/2.5/weather?"
 # https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API key}
 
 
-def FindCoord(Name_Based_url):
+def FindCoord(City_Name):
+    Name_Based_url = f"{direct_base_url}q={City_Name}&limit=1&appid={API_key}"
     res = requests.get(Name_Based_url)
     info = res.json()
     print("Geo status code : ",res.status_code)
@@ -41,69 +42,49 @@ def FindCoord(Name_Based_url):
         return None
     
 
-def weather_analysis(coordinate):
+def get_weather_info(coordinate):
     coord_url = f"{coord_base_url}lat={coordinate[0]}&lon={coordinate[1]}&appid={API_key}&units=metric"
     res = requests.get(coord_url)
-    info = res.json()
-    print("the response is : ",res.status_code)
-    return info
+    if res.status_code !=200:
+        print("Error : ",res.text)
+        return None
+    return res.json()
 
 conn =  sq.connect("Weather_Data.db")
 cities = []
 
-while True:
-    print("write exit to quit")
-    City_Name = input("Enter the name of the city: ").lower().strip()
-    if(City_Name == "exit"):
-        break
-    cities.append(City_Name)
-    
-for city in cities:
-    Name_Based_url = f"{direct_base_url}q={city}&limit=1&appid={API_key}"
+def WeatherAnalysis(city_name,weather_info):
+    return {
+    "City Name": city_name,
+    "Temp": weather_info["main"]["temp"],
+    "Feels Like": weather_info["main"]["feels_like"],
+    "Pressure": weather_info["main"]["pressure"],
+    "Humidity": weather_info["main"]["humidity"],
+    "Description": weather_info["weather"][0]["description"],
+    "Wind Speed": weather_info["wind"]["speed"],
+    "Wind Deg": weather_info["wind"].get("deg"),
+    "Cloudiness": weather_info["clouds"]["all"],
+    "Visibility": weather_info["visibility"],
+    "Sunrise": weather_info["sys"]["sunrise"],
+    "Sunset": weather_info["sys"]["sunset"]
+    }
 
-    print("the url is : ",Name_Based_url)
-    coordinates = FindCoord(Name_Based_url)
+def main():
+    City_Name = input("Enter the name of the city: ").strip()
+    coordinates = FindCoord(City_Name)
 
     if coordinates == None:
         print("coordinate not found...skipping")
-        continue
-        
+        return
 
-    else:
-        weather_info = weather_analysis(coordinates)
-        df = pd.json_normalize(weather_info["main"])
-        df["City Name"] = city
-        
-    if __name__ == "__main__":
-            to_drop = ["temp_min","temp_max","sea_level","grnd_level"]
-            df.drop(to_drop,axis=1,inplace=True,errors="ignore")
+    weather_info = get_weather_info(coordinates)
 
-            #city name in 1st column 
-            check_col = ["City Name"] + [c for c in df.columns if c != "City Name"]
-            df = df[check_col]      
+    data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])
 
-            if os.path.isfile("weather_data.csv"):
-                
-                existing_df = pd.read_csv("weather_data.csv")
-                
+    print(data.to_string())
 
-                missing_cols = [c for c in df.columns if c not in existing_df.columns]
-                print(missing_cols)
-
-                existing_df = existing_df[df.columns]
-                print(existing_df)
-
-                combined_df = pd.concat([existing_df, df], ignore_index=True)
-                
-                combined_df.drop_duplicates(subset=["City Name"], keep="last", inplace=True)
-
-                combined_df.to_csv("weather_data.csv", mode="a", header=True, index=False)
-
-                print(combined_df)
-
-            else:
-                df.to_csv("weather_data.csv", mode="w", header=True, index=False)
-
+if __name__=="__main__":
+    main()
             
             
         
