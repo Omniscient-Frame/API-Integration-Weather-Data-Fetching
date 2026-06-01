@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import csv 
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -65,6 +66,9 @@ def WeatherAnalysis(city_name,weather_info):
     "Sunset": weather_info["sys"]["sunset"]
     }
 
+Db_Name = "Weather_Data.db"
+Table_name = "Weather"
+
 def PresentInfo():
     City_Name = input("Enter the name of the city: ").strip()
     coordinates = FindCoord(City_Name)
@@ -76,9 +80,20 @@ def PresentInfo():
 
     weather_info = get_weather_info(coordinates)
 
-    data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])
+    data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])    
+    data.insert(1,"Date",datetime.now().strftime("%Y-%m-%d"))
+    
+    SaveToDb(data)
+    print(f"Saved to {Db_Name} in table '{Table_name}'")
 
-    return data.to_string()
+    print(data.to_string())
+    
+
+def SaveToDb(df):
+    df = df.drop_duplicates(subset = ["City Name","Date"],keep="last")
+    conn = sq.connect(Db_Name)
+    df.to_sql(Table_name,conn,if_exists ="append",index =False)
+    conn.close()
 
 
 def main():
@@ -88,7 +103,7 @@ def main():
         UserInput = int(input("Enter 1 - to get weather info,\n 2 - to exit : "))
 
         if UserInput == 1:
-            print(PresentInfo())
+            PresentInfo()
 
         elif UserInput == 2:
             break
