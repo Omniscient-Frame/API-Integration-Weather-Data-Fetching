@@ -1,3 +1,5 @@
+from pandas.core.window import expanding
+import requests
 import sqlite3 as sq
 import requests
 import pandas as pd
@@ -12,42 +14,43 @@ load_dotenv()
 API_key = os.getenv("API_KEY")
 
 direct_base_url = "http://api.openweathermap.org/geo/1.0/direct?"
-# http://api.openweathermap.org/geo/1.0/direct?q=London&limit=5&appid={API key}
 
 coord_base_url = "https://api.openweathermap.org/data/2.5/weather?"
-# https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API key}
 
 
 def FindCoord(City_Name):
-    Name_Based_url = f"{direct_base_url}q={City_Name}&limit=1&appid={API_key}"
-    res = requests.get(Name_Based_url)
-    info = res.json()
-    print("Geo status code : ",res.status_code)
+    try:
+        Name_Based_url = f"{direct_base_url}q={City_Name}&limit=1&appid={API_key}"
+
+        res = requests.get(Name_Based_url)
+        res.raise_for_status()
+        info = res.json()
     
-    if res.status_code == 200:
-        if info == [] :
-            print("City not found")
-            return None
+        if res.status_code == 200:
+            if not info :
+                print("City not found")
+                return None
 
-        coord = info[0]
-        latitutude = coord["lat"]
-        longitude = coord["lon"]
-        print("latitude : ",latitutude)
-        print("longitude : ",longitude)
-        return [latitutude,longitude]
+            coord = info[0]
+            return [coord["lat"], coord["lon"]]
 
-    else:
-        print("Error : ",res.text)
+    except requests.exceptions.RequestException as e:
+        print(f"Geo API Error : {e}")
         return None
     
 
 def get_weather_info(coordinate):
-    coord_url = f"{coord_base_url}lat={coordinate[0]}&lon={coordinate[1]}&appid={API_key}&units=metric"
-    res = requests.get(coord_url)
-    if res.status_code !=200:
-        print("Error : ",res.text)
+    try:
+        coord_url = f"{coord_base_url}lat={coordinate[0]}&lon={coordinate[1]}&appid={API_key}&units=metric"
+
+        res = requests.get(coord_url , timeout=10)
+        res.raise_for_status()
+
+        return res.json()
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Weather API Error : {e}")
         return None
-    return res.json()
 
 
 def WeatherAnalysis(city_name,weather_info):
@@ -90,47 +93,57 @@ def PresentInfo():
     
 
 def SaveToDb(df):
-    conn = sq.connect(Db_Name)
-    cur = conn.cursor()
+    try:
+        conn = sq.connect(Db_Name)
+        cur = conn.cursor()
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS weather (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    "City Name" TEXT NOT NULL,
-    Date TEXT NOT NULL,
-    Temp REAL,
-    Feels_Like REAL,
-    Pressure REAL,
-    Humidity REAL,
-    Description TEXT,
-    Wind_Speed REAL,
-    Wind_Degree REAL,
-    Cloudiness INTEGER,
-    Visibility INTEGER,
-    Sunrise INTEGER,
-    Sunset INTEGER,
-    UNIQUE("City Name", Date))""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS weather (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        "City Name" TEXT NOT NULL,
+        Date TEXT NOT NULL,
+        Temp REAL,
+        Feels_Like REAL,
+        Pressure REAL,
+        Humidity REAL,
+        Description TEXT,
+        Wind_Speed REAL,
+        Wind_Degree REAL,
+        Cloudiness INTEGER,
+        Visibility INTEGER,
+        Sunrise INTEGER,
+        Sunset INTEGER,
+        UNIQUE("City Name", Date))""")
 
-    row = df.iloc[0].to_dict()
+        row = df.iloc[0].to_dict()
+        
+        cur.execute("""
+        INSERT OR IGNORE INTO weather
+        ("City Name", Date, Temp, Feels_Like, Pressure, Humidity, Description,
+        Wind_Speed, Wind_Degree, Cloudiness, Visibility, Sunrise, Sunset)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,(row["City Name"], row["Date"], row["Temp"], row["Feels_Like"],
+        row["Pressure"], row["Humidity"], row["Description"],
+        row["Wind_Speed"], row["Wind_Deg"], row["Cloudiness"],
+        row["Visibility"], row["Sunrise"], row["Sunset"]))
+
+        conn.commit()
+        
+    except sq.Error as e:
+        print(f"Database Error : {e}")
     
-    cur.execute("""
-    INSERT OR IGNORE INTO weather
-    ("City Name", Date, Temp, Feels_Like, Pressure, Humidity, Description,
-     Wind_Speed, Wind_Degree, Cloudiness, Visibility, Sunrise, Sunset)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,(row["City Name"], row["Date"], row["Temp"], row["Feels_Like"],
-    row["Pressure"], row["Humidity"], row["Description"],
-    row["Wind_Speed"], row["Wind_Deg"], row["Cloudiness"],
-    row["Visibility"], row["Sunrise"], row["Sunset"]))
-
-    conn.commit()
-    conn.close()
+    finally:
+        conn.close()
 
 
 def main():
 
     while True:
-
-        UserInput = int(input("Enter 1 - to get weather info,\n 2 - to exit : "))
+        try:
+            UserInput = int(input("Enter 1 - to get weather info,\n 2 - to exit : "))
+        
+        except ValueError:
+            print("Invalid Input...Try Again")
+            continue
 
         if UserInput == 1:
             PresentInfo()
@@ -140,7 +153,7 @@ def main():
 
         else:
             print("Invalid Input...Try Again")
-            continue
+            
     
 if __name__=="__main__":
     main()            
