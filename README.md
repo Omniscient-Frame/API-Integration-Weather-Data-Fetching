@@ -89,10 +89,12 @@ python weather_api.py
 ## Example Output
 
 ```text
-Enter the name of the city: Kanpur
-Temperature: 31.2 °C
-Feels like: 34.1 °C
-Humidity: 68%
+Enter 1 - to get weather info,
+ 2 - to exit : 1
+Enter the name of the city: agra
+Saved to Weather_Data.db in table 'Weather'
+  City Name        Date   Temp  Feels_Like  Pressure  Humidity       Description  Wind_Speed  Wind_Deg  Cloudiness  Visibility     Sunrise      Sunset
+0      agra  2026-06-02  34.02       36.27      1002        43  scattered clouds        3.09       260          40        6000  1780358021  1780407507
 ```
 
 ## Database Storage
