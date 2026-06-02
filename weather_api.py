@@ -1,13 +1,12 @@
-from pandas.core.window import expanding
 import requests
 import sqlite3 as sq
 import requests
 import pandas as pd
-import numpy as np
-import csv 
+import logging
 import os
-from datetime import datetime
+from datetime import datetime , timezone
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -18,6 +17,21 @@ direct_base_url = "http://api.openweathermap.org/geo/1.0/direct?"
 coord_base_url = "https://api.openweathermap.org/data/2.5/weather?"
 
 
+ENV = os.environ.get("ENV", "development").lower()
+
+if ENV == "development":
+    LOGLEVEL = logging.DEBUG
+else:
+    LOGLEVEL = logging.WARNING
+
+logging.basicConfig(
+    level=LOGLEVEL,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename="weather_app.log",
+    filemode="a"
+)
+
+
 def FindCoord(City_Name):
     try:
         Name_Based_url = f"{direct_base_url}q={City_Name}&limit=1&appid={API_key}"
@@ -25,17 +39,20 @@ def FindCoord(City_Name):
         res = requests.get(Name_Based_url)
         res.raise_for_status()
         info = res.json()
-    
+        StateName = info[0]["state"]
         if res.status_code == 200:
             if not info :
                 print("City not found")
+                logging.warning(f"{City_Name} not found")
                 return None
 
             coord = info[0]
-            return [coord["lat"], coord["lon"]]
+            return [coord["lat"], coord["lon"]] , StateName
+        
 
     except requests.exceptions.RequestException as e:
         print(f"Geo API Error : {e}")
+        logging.error(f"Geo API Error: {res.text}")
         return None
     
 
@@ -50,11 +67,16 @@ def get_weather_info(coordinate):
     
     except requests.exceptions.RequestException as e:
         print(f"Weather API Error : {e}")
+        logging.error(f"Weather API Error: {res.text}")
         return None
 
+def format_unix_time(unix_ts):
+    return datetime.fromtimestamp(unix_ts, tz=timezone.utc).strftime("%H:%M:%S")
 
-def WeatherAnalysis(city_name,weather_info):
+
+def WeatherAnalysis(city_name,weather_info,State_Name):
     return {
+    "State":State_Name,
     "City Name": city_name,
     "Temp": weather_info["main"]["temp"],
     "Feels_Like": weather_info["main"]["feels_like"],
@@ -65,26 +87,27 @@ def WeatherAnalysis(city_name,weather_info):
     "Wind_Deg": weather_info["wind"].get("deg"),
     "Cloudiness": weather_info["clouds"]["all"],
     "Visibility": weather_info["visibility"],
-    "Sunrise": weather_info["sys"]["sunrise"],
-    "Sunset": weather_info["sys"]["sunset"]
+    "Sunrise": format_unix_time(weather_info["sys"]["sunrise"]),
+    "Sunset": format_unix_time(weather_info["sys"]["sunset"])
     }
+
 
 Db_Name = "Weather_Data.db"
 Table_name = "Weather"
 
+
 def PresentInfo():
     City_Name = input("Enter the name of the city: ").strip()
-    coordinates = FindCoord(City_Name)
+    coordinates , StateName = FindCoord(City_Name)
 
     if coordinates == None:
-        print("coordinate not found...exiting")
-        print("Enter Valid City Name..")
+        print("coordinate not found Enter Valid City Name.....exiting")
         return
 
     weather_info = get_weather_info(coordinates)
 
-    data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])    
-    data.insert(1,"Date",datetime.now().strftime("%Y-%m-%d"))
+    data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info,StateName)])
+    data.insert(2,"Date",datetime.now().strftime("%Y-%m-%d"))
 
     SaveToDb(data)
     print(f"Saved to {Db_Name} in table '{Table_name}'")
@@ -99,6 +122,7 @@ def SaveToDb(df):
 
         cur.execute("""CREATE TABLE IF NOT EXISTS weather (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        "State Name" TEXT NOT NULL,
         "City Name" TEXT NOT NULL,
         Date TEXT NOT NULL,
         Temp REAL,
@@ -118,10 +142,10 @@ def SaveToDb(df):
         
         cur.execute("""
         INSERT OR IGNORE INTO weather
-        ("City Name", Date, Temp, Feels_Like, Pressure, Humidity, Description,
+        ("State Name","City Name", Date, Temp, Feels_Like, Pressure, Humidity, Description,
         Wind_Speed, Wind_Degree, Cloudiness, Visibility, Sunrise, Sunset)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,(row["City Name"], row["Date"], row["Temp"], row["Feels_Like"],
+        VALUES (? , ? , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,(row["State"],row["City Name"], row["Date"], row["Temp"], row["Feels_Like"],
         row["Pressure"], row["Humidity"], row["Description"],
         row["Wind_Speed"], row["Wind_Deg"], row["Cloudiness"],
         row["Visibility"], row["Sunrise"], row["Sunset"]))
@@ -130,6 +154,7 @@ def SaveToDb(df):
         
     except sq.Error as e:
         print(f"Database Error : {e}")
+        logging.exception("Database error while saving weather data")
     
     finally:
         conn.close()
@@ -153,7 +178,7 @@ def main():
 
         else:
             print("Invalid Input...Try Again")
-            
+
     
 if __name__=="__main__":
     main()            
