@@ -54,12 +54,12 @@ def WeatherAnalysis(city_name,weather_info):
     return {
     "City Name": city_name,
     "Temp": weather_info["main"]["temp"],
-    "Feels Like": weather_info["main"]["feels_like"],
+    "Feels_Like": weather_info["main"]["feels_like"],
     "Pressure": weather_info["main"]["pressure"],
     "Humidity": weather_info["main"]["humidity"],
     "Description": weather_info["weather"][0]["description"],
-    "Wind Speed": weather_info["wind"]["speed"],
-    "Wind Deg": weather_info["wind"].get("deg"),
+    "Wind_Speed": weather_info["wind"]["speed"],
+    "Wind_Deg": weather_info["wind"].get("deg"),
     "Cloudiness": weather_info["clouds"]["all"],
     "Visibility": weather_info["visibility"],
     "Sunrise": weather_info["sys"]["sunrise"],
@@ -82,7 +82,7 @@ def PresentInfo():
 
     data = pd.DataFrame([WeatherAnalysis(City_Name,weather_info)])    
     data.insert(1,"Date",datetime.now().strftime("%Y-%m-%d"))
-    
+
     SaveToDb(data)
     print(f"Saved to {Db_Name} in table '{Table_name}'")
 
@@ -90,9 +90,39 @@ def PresentInfo():
     
 
 def SaveToDb(df):
-    df = df.drop_duplicates(subset = ["City Name","Date"],keep="last")
     conn = sq.connect(Db_Name)
-    df.to_sql(Table_name,conn,if_exists ="append",index =False)
+    cur = conn.cursor()
+
+    cur.execute("""CREATE TABLE IF NOT EXISTS weather (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "City Name" TEXT NOT NULL,
+    Date TEXT NOT NULL,
+    Temp REAL,
+    Feels_Like REAL,
+    Pressure REAL,
+    Humidity REAL,
+    Description TEXT,
+    Wind_Speed REAL,
+    Wind_Degree REAL,
+    Cloudiness INTEGER,
+    Visibility INTEGER,
+    Sunrise INTEGER,
+    Sunset INTEGER,
+    UNIQUE("City Name", Date))""")
+
+    row = df.iloc[0].to_dict()
+    
+    cur.execute("""
+    INSERT OR IGNORE INTO weather
+    ("City Name", Date, Temp, Feels_Like, Pressure, Humidity, Description,
+     Wind_Speed, Wind_Degree, Cloudiness, Visibility, Sunrise, Sunset)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,(row["City Name"], row["Date"], row["Temp"], row["Feels_Like"],
+    row["Pressure"], row["Humidity"], row["Description"],
+    row["Wind_Speed"], row["Wind_Deg"], row["Cloudiness"],
+    row["Visibility"], row["Sunrise"], row["Sunset"]))
+
+    conn.commit()
     conn.close()
 
 
