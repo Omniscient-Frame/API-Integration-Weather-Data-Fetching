@@ -94,7 +94,7 @@ def WeatherAnalysis(city_name,weather_info,State_Name):
 
 
 Db_Name = "Weather_Data.db"
-Table_name = "Weather"
+Table_name = "weather"
 
 
 def PresentInfo():
@@ -164,10 +164,18 @@ def SaveToDb(df):
 
 
 def ViewSaveData():
-    conn = sq.connect(Db_Name)
-    df = pd.read_sql_query("SELECT * FROM weather", conn)
-    conn.close()
-    print(df.to_string())
+
+    try:
+        conn = sq.connect(Db_Name)
+        df = pd.read_sql_query("SELECT * FROM weather ORDER BY Date DESC", conn)
+        print(df.to_string())
+
+    except Exception as e:
+        logging.exception(f"DataBase Error : {e}")
+        print("Failed to Retrive.....\n")
+    
+    finally:
+        conn.close()
 
 
 def main():
