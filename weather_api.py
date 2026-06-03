@@ -39,7 +39,6 @@ def FindCoord(City_Name):
         res = requests.get(Name_Based_url)
         res.raise_for_status()
         info = res.json()
-        StateName = info[0]["state"]
         if res.status_code == 200:
             if not info :
                 print("City not found")
@@ -47,6 +46,7 @@ def FindCoord(City_Name):
                 return None
 
             coord = info[0]
+            StateName = coord.get("state") or "Unknown"
             return [coord["lat"], coord["lon"]] , StateName
         
 
@@ -67,8 +67,9 @@ def get_weather_info(coordinate):
     
     except requests.exceptions.RequestException as e:
         print(f"Weather API Error : {e}")
-        logging.error(f"Weather API Error: {res.text}")
+        logging.error(f"Weather API Error: {e}")
         return None
+
 
 def format_unix_time(unix_ts):
     return datetime.fromtimestamp(unix_ts, tz=timezone.utc).strftime("%H:%M:%S")
@@ -99,6 +100,8 @@ Table_name = "Weather"
 def PresentInfo():
     City_Name = input("Enter the name of the city: ").strip()
     coordinates , StateName = FindCoord(City_Name)
+    if not StateName:
+        StateName = "Unknown"
 
     if coordinates == None:
         print("coordinate not found Enter Valid City Name.....exiting")
@@ -160,24 +163,35 @@ def SaveToDb(df):
         conn.close()
 
 
+def ViewSaveData():
+    conn = sq.connect(Db_Name)
+    df = pd.read_sql_query("SELECT * FROM weather", conn)
+    conn.close()
+    print(df.to_string())
+
+
 def main():
 
     while True:
         try:
-            UserInput = int(input("Enter 1 - to get weather info,\n 2 - to exit : "))
+            UserInput = int(input
+                ("1 - Get weather info\n"
+                "2 - View saved data\n"
+                "3 - to exit\n"
+                "Enter Choice : ")
+            )
         
         except ValueError:
             print("Invalid Input...Try Again")
             continue
 
-        if UserInput == 1:
-            PresentInfo()
+        if UserInput == 1: PresentInfo()
 
-        elif UserInput == 2:
-            break
+        elif UserInput == 2: ViewSaveData()
 
-        else:
-            print("Invalid Input...Try Again")
+        elif UserInput == 3: break
+
+        else: print("Invalid Input...Try Again")
 
     
 if __name__=="__main__":
