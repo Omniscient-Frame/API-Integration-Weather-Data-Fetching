@@ -178,6 +178,10 @@ def ViewSaveData():
         conn.close()
 
 
+def comparecity():
+    pass
+
+
 def main():
 
     while True:
@@ -204,7 +208,4 @@ def main():
     
 if __name__=="__main__":
     main()            
-
-        
-
 
